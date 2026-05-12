@@ -1,6 +1,3 @@
-# compose.yaml
-# Multi-tier web application: React + Spring Boot + MySQL + Nginx reverse proxy
-
 services:
 
   # ── DATABASE SERVICE ────────────────────────────────
