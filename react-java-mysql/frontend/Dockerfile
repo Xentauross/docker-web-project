@@ -1,38 +1,27 @@
 # syntax=docker/dockerfile:1.4
 
-FROM --platform=$BUILDPLATFORM node:lts AS development
+# ── STAGE 1: Dependencies ─────────────────────────────
+FROM --platform=$BUILDPLATFORM node:18-alpine AS development
 
-WORKDIR /code
-COPY package.json /code/package.json
-COPY package-lock.json /code/package-lock.json
-
+WORKDIR /app
+COPY package.json /app/package.json
+COPY package-lock.json /app/package-lock.json
 RUN npm ci
-COPY . /code
+COPY . /app
 
 ENV CI=true
 ENV PORT=3000
 
 CMD [ "npm", "start" ]
 
-FROM development AS dev-envs
-RUN <<EOF
-apt-get update
-apt-get install -y git
-EOF
-
-RUN <<EOF
-useradd -s /bin/bash -m vscode
-groupadd docker
-usermod -aG docker vscode
-EOF
-# install Docker tools (cli, buildx, compose)
-COPY --from=gloursdocker/docker / /
-CMD [ "npm", "start" ]
-
+# ── STAGE 2: Build of production ──────────────────────
 FROM development AS build
+RUN npm run build
 
-RUN ["npm", "run", "build"]
+# ── STAGE 3: Final image (production) ─────────
+FROM nginx:alpine AS production
 
-FROM nginx:1.13-alpine
+COPY --from=build /app/build /usr/share/nginx/html
 
-COPY --from=build /code/build /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
