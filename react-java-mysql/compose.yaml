@@ -1,58 +1,103 @@
+# compose.yaml
+# Multi-tier web application: React + Spring Boot + MySQL + Nginx reverse proxy
+
 services:
-  backend:
-    build: backend
+
+  # ── DATABASE SERVICE ────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: mysql_db
     restart: always
-    secrets:
-      - db-password
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      # Persistent volume for database data
+      - db_data:/var/lib/mysql
+    networks:
+      - spring-mysql
+    # Healthcheck: ensures MySQL is ready before backend starts
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # Resource limits to prevent memory exhaustion on host
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # ── BACKEND SERVICE (Spring Boot) ───────────────────
+  backend:
+    build:
+      context: backend
+      # Use production stage only (no Maven, no source code)
+      target: production
+    container_name: spring_backend
+    restart: always
     environment:
       MYSQL_HOST: db
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     networks:
       - react-spring
       - spring-mysql
+    # Backend starts only when database is fully healthy
     depends_on:
       db:
         condition: service_healthy
-  db:
-    # We use a mariadb image which supports both amd64 & arm64 architecture
-    image: mariadb:10.6.4-focal
-    # If you really want to use MySQL, uncomment the following line
-    #image: mysql:8.0.19
-    environment:
-      - MYSQL_DATABASE=example
-      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/db-password
-    restart: always
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
-      interval: 3s
-      retries: 5
-      start_period: 30s
-    secrets:
-      - db-password
-    volumes:
-      - db-data:/var/lib/mysql
-    networks:
-      - spring-mysql
+    # Resource limits to prevent memory leaks from exhausting host
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.75'
+
+  # ── FRONTEND SERVICE (React) ─────────────────────────
   frontend:
     build:
       context: frontend
-      target: development
-    ports:
-      - 3000:3000
-    volumes:
-      - ./frontend/src:/code/src
-      - /project/node_modules
+      # Use production stage: lightweight Nginx image with built assets
+      target: production
+    container_name: react_frontend
+    restart: always
     networks:
       - react-spring
     depends_on:
       - backend
-    expose:
-      - 3306
-      - 33060
-volumes:
-  db-data: {}
-secrets:
-  db-password:
-    file: db/password.txt
+
+  # ── REVERSE PROXY SERVICE (Nginx) ───────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: reverse_proxy
+    restart: always
+    # Only port exposed to the host — single entry point for all traffic
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - react-spring
+    depends_on:
+      - frontend
+      - backend
+
+# ── ISOLATED NETWORKS ───────────────────────────────────
 networks:
-  react-spring: {}
-  spring-mysql: {}
+  # Network between Nginx, frontend and backend
+  react-spring:
+    driver: bridge
+  # Network between backend and database only
+  spring-mysql:
+    driver: bridge
+
+# ── PERSISTENT VOLUMES ──────────────────────────────────
+volumes:
+  # Database data persists across container restarts
+  db_data:
