@@ -33,4 +33,4 @@ COPY --from=prepare-production ${DEPENDENCY}/BOOT-INF/classes /app
 
 USER appuser
 
-ENTRYPOINT ["java", "-cp", "app:app/lib/*", "com.example.demo.DemoApplication"]
+ENTRYPOINT ["java", "-cp", "app:app/lib/*", "com.company.project.Application"]
