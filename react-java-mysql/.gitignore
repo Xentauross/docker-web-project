@@ -1,0 +1,39 @@
+# Environment variables - never upload credentials
+.env
+
+# Database backups - generated files, not source code
+backups/*.sql
+
+# Database secrets
+db/password.txt
+
+# Node modules - too heavy, regenerated with npm install
+frontend/node_modules/
+frontend/.pnp
+frontend/.pnp.js
+
+# React build output - regenerated with npm run build
+frontend/build/
+
+# Maven build output - regenerated with mvn install
+backend/target/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# OS generated files
+.DS_Store
+.DS_Store?
+Thumbs.db
+desktop.ini
+
+# Docker
+.docker/
+
+# Logs
+*.log
+logs/
