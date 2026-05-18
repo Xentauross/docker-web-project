@@ -1,7 +1,14 @@
 #!/bin/bash
 
+# Stop the script if any errors
+set -e
 # Load environment variables
-source .env
+if [ -f .env ]; then
+    source .env
+else
+    echo "ERROR: El archivo .env no se encuentra en el directorio actual."
+    exit 1
+fi
 
 # Create backups folder if it doesn't exist
 mkdir -p ./backups
